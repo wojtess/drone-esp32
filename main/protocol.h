@@ -3,6 +3,9 @@
 #include <inttypes.h>
 #include "core.h"
 
+extern uint8_t magic_number[2];
+
+//camera data
 typedef struct {
     long unsigned int index;
     long unsigned int len;
@@ -11,6 +14,7 @@ typedef struct {
 
 int send_packet_0x01(packet_out_0x01 packet);
 
+//current pitch yaw roll throttle and time of sent
 typedef struct {
     int32_t time;
     
@@ -30,6 +34,24 @@ typedef struct {
 } packet_in_0x01;
 
 void handle_packet_0x01(state_t* state, packet_in_0x01* packet);
+
+//config packet
+typedef struct {
+    uint32_t frequency;
+    bool packet_3;//if true then use data from packet_0x03, if false use data from packet_0x01
+} packet_in_0x02;
+
+void handle_packet_0x02(state_t* state, packet_in_0x02* packet);
+
+//duty packet
+typedef struct {
+    uint32_t duty0;
+    uint32_t duty1;
+    uint32_t duty2;
+    uint32_t duty3;
+} packet_in_0x03;
+
+void handle_packet_0x03(state_t* state, packet_in_0x03* packet);
 
 typedef struct {
     uint8_t magic[2];

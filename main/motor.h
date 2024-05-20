@@ -11,7 +11,7 @@ enum Motor {
 void initMotorsDefault();
 void initMotors(int, int, int, int);
 
-void setPWMMotor(enum Motor, int);
+void setPWMMotor(enum Motor, float);
 
 
 #endif

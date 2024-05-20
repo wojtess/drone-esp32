@@ -12,9 +12,10 @@
 #include "esp_camera.h"
 
 state_t state;
+QueueHandle_t sniffer_fifo;
 
 static size_t jpg_encode_stream(void * arg, size_t index, const void* data, size_t len) {
-    printf("recived line\n");
+    printf("recived line - not seding anything\n");
     // int err = send_packet_0x01((packet_out_0x01){
     //     index,
     //     len,
@@ -26,7 +27,6 @@ static size_t jpg_encode_stream(void * arg, size_t index, const void* data, size
     // }
     return 0;
 }
-
 
 void sniffer_callback(void* buf, wifi_promiscuous_pkt_type_t type) {
     // if(type != WIFI_PKT_DATA) {
@@ -43,66 +43,49 @@ void sniffer_callback(void* buf, wifi_promiscuous_pkt_type_t type) {
     }
     //IEEE header cut
     pkt_len -= 24;
+    buffer += 24;
 
-    if(pkt_len < 3) {
+    if(pkt_len < sizeof(magic_number) + 1) {
         //packet to small to contain magic number and packet id
         return;
     }
-
-    //IEEE header cut
-    buffer += 24;
 
     header_t* header = (header_t*)buffer;
 
     if(header->magic[0] == 0x3C || header->magic[1] == 0x4A) {
         // printf("recived packet with matching magic number, length: %d, packet id: %d\n", pkt_len, header->id);
-        buffer += sizeof(header_t);
-        pkt_len -= sizeof(header_t);
 
-        int err = decode_and_handle_packet(&state, header, buffer, pkt_len);
-        if(err != 0) {
-            printf("error while decoding and hadling packet: %d\n", err);
-        }
+        sniffer_data data = {buffer, pkt_len};
+
+        xQueueSend(sniffer_fifo, &data, 0);
     }
 }
 
-void sendTask(void* p) {
-    // char packet_ieee80211[] = {
-    //     0x48, 0x00, 0x00, 0x00,
-    //     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,//addr1
-    //     0x13, 0x22, 0x33, 0x44, 0x55, 0x66,//addr2
-    //     0x13, 0x22, 0x33, 0x44, 0x55, 0x66,//addr3
-    //     0x00, 0x00,//duration or seq number, idk
-    // };
-
+void send_task(void* p) {
     while(1) {
-        // extern int esp_wifi_80211_tx_mod(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
+        if(xSemaphoreTake(state.mutex, 0)) {
+            uint64_t data[4];
 
-        // esp_wifi_80211_tx_mod(WIFI_IF_STA, packet_ieee80211, sizeof(packet_ieee80211), false);
+            memcpy(data, &state.controls.throttle, sizeof(state.controls.throttle));
+            memcpy(data + 1, &state.controls.yaw, sizeof(state.controls.yaw));
+            memcpy(data + 2, &state.controls.pitch, sizeof(state.controls.pitch));
+            memcpy(data + 3, &state.controls.roll, sizeof(state.controls.roll));
 
-        double throttle = 0.0;
-        double yaw = 0.0;
-        double pitch = 0.0;
-        double roll = 0.0;
+            packet_out_0x02 packet = {
+                time(0),
+                data[0],
+                data[1],
+                data[2],
+                data[3]
+            };
 
-        uint64_t data[4];
+            printf("sending shit\n");
 
-        memcpy(data, &throttle, sizeof(throttle));
-        memcpy(data + 1, &yaw, sizeof(yaw));
-        memcpy(data + 2, &pitch, sizeof(pitch));
-        memcpy(data + 3, &roll, sizeof(roll));
+            send_packet_0x02(packet);
+            xSemaphoreGive(state.mutex);
 
-        packet_out_0x02 packet = {
-            time(0),
-            data[0],
-            data[1],
-            data[2],
-            data[3]
-        };
-
-        send_packet_0x02(packet);
-
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
     }
 }
 
@@ -181,9 +164,18 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(sniffer_callback));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
 
+    state.mutex = xSemaphoreCreateMutex();
 
-    xTaskCreate(&capture_task, "captureTask", 4096, 0, 4, 0);
-    xTaskCreate(&sendTask, "sendTask", 4096, 0, 5, 0);
+    sniffer_fifo = xQueueCreate(10, sizeof(sniffer_data));
+
+    core_task_init_data* data_core_task = malloc(sizeof(core_task_init_data));
+    data_core_task->sniffer_fifo = &sniffer_fifo;
+    data_core_task->state = &state;
+
+    xTaskCreate(&capture_task, "capture_task", 4096, 0, 4, 0);
+    xTaskCreate(&send_task, "send_task", 4096, 0, 5, 0);
+    //data_core_task is freed in core_task after reciving it
+    xTaskCreate(&core_task, "core_task", 4096, data_core_task, tskIDLE_PRIORITY, 0);
 }
 
 

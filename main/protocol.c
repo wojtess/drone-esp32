@@ -6,6 +6,10 @@
 #include <inttypes.h>
 #include <string.h>
 
+uint8_t magic_number[]= {
+   0x3C, 0x4A,//magic number
+};
+
 //SEND
 uint8_t ieee80211header[] = {
     //IEEE802.11 header
@@ -15,10 +19,6 @@ uint8_t ieee80211header[] = {
     0x13, 0x22, 0x33, 0x44, 0x55, 0x66,//addr3
     0x00, 0x00,//duration or seq number, idk
     //END IEEE802.11 header
-};
-
-uint8_t magic_number[] = {
-    0x3C, 0x4A,//magic number
 };
 
 int send_packet_0x02(packet_out_0x02 packet) {
@@ -111,10 +111,22 @@ void handle_packet_0x01(state_t* state, packet_in_0x01* packet) {
     );
 }
 
+void handle_packet_0x02(state_t* state, packet_in_0x02* packet) {
+    state->pwmRaw = packet->packet_3;
+    state->pwmControls.freq = packet->frequency;
+}
+
+void handle_packet_0x03(state_t* state, packet_in_0x03* packet) {
+    state->pwmControls.duty0 = packet->duty0;
+    state->pwmControls.duty1 = packet->duty1;
+    state->pwmControls.duty2 = packet->duty2;
+    state->pwmControls.duty3 = packet->duty3;
+}
+
 int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int length) {
     switch (header->id)
     {
-    case 1:
+    case 1: {
         if(length - (int)sizeof(packet_in_0x01) < 0) {
             return -2;
         }
@@ -122,7 +134,25 @@ int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int
         buffer += sizeof(packet_in_0x01);
         length -= sizeof(packet_in_0x01);
         break;
-    
+    }
+    case 2: {
+        if(length - (int)sizeof(packet_in_0x02) < 0) {
+            return -3;
+        }
+        handle_packet_0x02(state, (packet_in_0x02*)buffer);
+        buffer += sizeof(packet_in_0x02);
+        length -= sizeof(packet_in_0x02);
+        break;
+    }
+    case 3: {
+        if(length - (int)sizeof(packet_in_0x03) < 0) {
+            return -4;
+        }
+        handle_packet_0x03(state, (packet_in_0x03*)buffer);
+        buffer += sizeof(packet_in_0x03);
+        length -= sizeof(packet_in_0x03);
+        break;
+    }
     default:
         return -1;
         break;
