@@ -22,11 +22,15 @@ uint8_t ieee80211header[] = {
 };
 
 int send_packet_0x02(packet_out_0x02 packet) {
-    char buf[sizeof(ieee80211header) + sizeof(magic_number) + /*packet id*/ 1 + sizeof(packet)];
+    size_t buf_size = sizeof(ieee80211header) + sizeof(magic_number) + 1 + sizeof(packet);
+    char* buf = malloc(buf_size);
+    if (!buf) {
+        return -1;
+    }
 
     memcpy(buf, &ieee80211header, sizeof(ieee80211header));
     memcpy(buf + sizeof(ieee80211header), &magic_number, sizeof(magic_number));
-    buf[sizeof(ieee80211header) + sizeof(magic_number) + 1] = 0x02;
+    buf[sizeof(ieee80211header) + sizeof(magic_number)] = 0x02;
     memcpy(buf + sizeof(ieee80211header) + sizeof(magic_number) + /*packet id*/1, &packet, sizeof(packet));
 
     extern int esp_wifi_80211_tx_mod(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
@@ -42,11 +46,10 @@ int send_packet_0x02(packet_out_0x02 packet) {
 int encode_packet_out_0x01(packet_out_0x01 packet, void** buf, int* len) {
     *len = 4/*index*/ + 4/*len*/ + packet.len /*data*/;
     *buf = malloc(*len);
-    if(*buf == 0) {
-        free(buf);
+    if(*buf == NULL) {
         return -1;
     }
-    memcpy(buf + 4/*index*/ + 4/*len*/, packet.data, packet.len);
+    memcpy((uint8_t*)*buf + 4 + 4, packet.data, packet.len);
     return 0;
 }
 
@@ -92,7 +95,7 @@ int send_packet_0x01(packet_out_0x01 packet) {
 //RECIVE
 void handle_packet_0x01(state_t* state, packet_in_0x01* packet) {
     uint64_t throttleRaw = end_be64toh(packet->throttle);
-    memcpy(&state->controls.throttle, &throttleRaw, sizeof(state->controls.throttle));
+    state->controls.throttle = (double)throttleRaw;
 
     uint64_t pitchRaw = end_be64toh(packet->pitch);
     memcpy(&state->controls.pitch, &pitchRaw, sizeof(state->controls.pitch));
@@ -131,7 +134,7 @@ int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int
             return -2;
         }
         handle_packet_0x01(state, (packet_in_0x01*)buffer);
-        buffer += sizeof(packet_in_0x01);
+        buffer = (uint8_t*)buffer + sizeof(packet_in_0x01);
         length -= sizeof(packet_in_0x01);
         break;
     }
@@ -140,7 +143,7 @@ int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int
             return -3;
         }
         handle_packet_0x02(state, (packet_in_0x02*)buffer);
-        buffer += sizeof(packet_in_0x02);
+        buffer = (uint8_t*)buffer + sizeof(packet_in_0x02);
         length -= sizeof(packet_in_0x02);
         break;
     }
@@ -149,7 +152,7 @@ int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int
             return -4;
         }
         handle_packet_0x03(state, (packet_in_0x03*)buffer);
-        buffer += sizeof(packet_in_0x03);
+        buffer = (uint8_t*)buffer + sizeof(packet_in_0x03);
         length -= sizeof(packet_in_0x03);
         break;
     }

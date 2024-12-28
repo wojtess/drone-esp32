@@ -24,7 +24,11 @@ void initMotors(int motorA, int motorB, int motorC, int motorD) {
         .clk_cfg          = LEDC_AUTO_CLK
     };
 
-    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+    esp_err_t err = ledc_timer_config(&ledc_timer);
+    if (err != ESP_OK) {
+        ESP_LOGE("MOTOR", "Failed to configure LEDC timer: %s", esp_err_to_name(err));
+        return err;
+    }
 
      // Prepare and then apply the LEDC PWM channel configuration
     ledc_channel_config_t ledc_channel0 = {
@@ -77,6 +81,6 @@ void initMotors(int motorA, int motorB, int motorC, int motorD) {
 }
 
 void setPWMMotor(enum Motor motor, float pwm) {
-    ledc_set_duty(LEDC_MODE, motor, (int)((pow(2.0, 13.0) - 1.0) * pwm));
+    ledc_set_duty(LEDC_MODE, motor, (int)(8191 * pwm)); // 2^13 - 1 = 8191
     ledc_update_duty(LEDC_MODE, motor);
 }
