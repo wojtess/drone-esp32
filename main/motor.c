@@ -12,20 +12,28 @@
 // Note: 13-bit resolution means duty cycle values range from 0 to 8191 (2^13 - 1)
 #define LEDC_FREQUENCY          (5000) // Frequency in Hertz. Set frequency at 5 kHz
 
-void initMotorsDefault() {
-    initMotors(12, 13, 15, 14);
+esp_err_t initMotorsDefault() {
+    return initMotors(12, 13, 15, 14);
 }
 
-void initMotors(int motorA, int motorB, int motorC, int motorD) {
+esp_err_t initMotors(int motorA, int motorB, int motorC, int motorD) {
+    esp_err_t err = ESP_OK;
+    
+    // Validate GPIO pins
+    if (motorA < 0 || motorB < 0 || motorC < 0 || motorD < 0) {
+        ESP_LOGE("MOTOR", "Invalid GPIO pin numbers");
+        return ESP_ERR_INVALID_ARG;
+    }
+
     ledc_timer_config_t ledc_timer = {
         .speed_mode       = LEDC_MODE,
         .timer_num        = LEDC_TIMER,
         .duty_resolution  = LEDC_DUTY_RES,
-        .freq_hz          = LEDC_FREQUENCY,  // Set output frequency at 5 kHz
+        .freq_hz          = LEDC_FREQUENCY,
         .clk_cfg          = LEDC_AUTO_CLK
     };
 
-    esp_err_t err = ledc_timer_config(&ledc_timer);
+    err = ledc_timer_config(&ledc_timer);
     if (err != ESP_OK) {
         ESP_LOGE("MOTOR", "Failed to configure LEDC timer: %s", esp_err_to_name(err));
         return err;
