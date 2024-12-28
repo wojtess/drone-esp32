@@ -7,7 +7,8 @@
 #include <string.h>
 
 uint8_t magic_number[]= {
-   0x3C, 0x4A,//magic number
+   0x3C, 0x4A, // Magic number to identify our protocol packets
+   // This helps distinguish our packets from other WiFi traffic
 };
 
 //SEND
@@ -22,6 +23,7 @@ uint8_t ieee80211header[] = {
 };
 
 int send_packet_0x02(packet_out_0x02 packet) {
+    // Packet structure: [IEEE802.11 header][magic number][packet ID][payload]
     size_t buf_size = sizeof(ieee80211header) + sizeof(magic_number) + 1 + sizeof(packet);
     char* buf = malloc(buf_size);
     if (!buf) {
@@ -33,6 +35,7 @@ int send_packet_0x02(packet_out_0x02 packet) {
     buf[sizeof(ieee80211header) + sizeof(magic_number)] = 0x02;
     memcpy(buf + sizeof(ieee80211header) + sizeof(magic_number) + /*packet id*/1, &packet, sizeof(packet));
 
+    // Use ESP32's low-level WiFi API to send raw 802.11 packets
     extern int esp_wifi_80211_tx_mod(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
 
     int err = esp_wifi_80211_tx_mod(WIFI_IF_STA, buf, sizeof(buf), false);
@@ -44,6 +47,7 @@ int send_packet_0x02(packet_out_0x02 packet) {
 }
 
 int encode_packet_out_0x01(packet_out_0x01 packet, void** buf, int* len) {
+    // Packet format: [4 bytes index][4 bytes length][variable data]
     *len = 4/*index*/ + 4/*len*/ + packet.len /*data*/;
     *buf = malloc(*len);
     if(*buf == NULL) {
@@ -94,6 +98,7 @@ int send_packet_0x01(packet_out_0x01 packet) {
 //END SEND
 //RECIVE
 void handle_packet_0x01(state_t* state, packet_in_0x01* packet) {
+    // Convert big-endian values from network to host byte order
     uint64_t throttleRaw = end_be64toh(packet->throttle);
     state->controls.throttle = (double)throttleRaw;
 
@@ -127,6 +132,7 @@ void handle_packet_0x03(state_t* state, packet_in_0x03* packet) {
 }
 
 int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int length) {
+    // Dispatch packet to appropriate handler based on packet ID
     switch (header->id)
     {
     case 1: {

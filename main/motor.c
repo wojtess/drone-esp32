@@ -9,6 +9,7 @@
 #define LEDC_MODE               LEDC_LOW_SPEED_MODE
 #define LEDC_DUTY_RES           LEDC_TIMER_13_BIT // Set duty resolution to 13 bits
 #define LEDC_DUTY               (4095) // Set duty to 50%. ((2 ** 13) - 1) * 50% = 4095
+// Note: 13-bit resolution means duty cycle values range from 0 to 8191 (2^13 - 1)
 #define LEDC_FREQUENCY          (5000) // Frequency in Hertz. Set frequency at 5 kHz
 
 void initMotorsDefault() {
@@ -81,6 +82,7 @@ void initMotors(int motorA, int motorB, int motorC, int motorD) {
 }
 
 void setPWMMotor(enum Motor motor, float pwm) {
+    // Convert float PWM value (0.0 to 1.0) to 13-bit integer (0 to 8191)
     ledc_set_duty(LEDC_MODE, motor, (int)(8191 * pwm)); // 2^13 - 1 = 8191
     ledc_update_duty(LEDC_MODE, motor);
 }
