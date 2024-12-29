@@ -3,6 +3,15 @@
 #include "protocol.h"
 #include "core.h"
 
+uint64_t double_to_uint64(double value) {
+    union {
+        double d;
+        uint64_t u;
+    } converter;
+    converter.d = value;
+    return converter.u;
+}
+
 void test_packet_handling() {
     printf("Testing packet handling...\n");
     
@@ -11,10 +20,10 @@ void test_packet_handling() {
     
     // Test packet 0x01
     packet_in_0x01 pkt1 = {
-        .throttle = end_htobe64(0x3FF0000000000000), // Double representation of 1.0
-        .pitch = end_htobe64(0x3FE0000000000000),    // Double representation of 0.5
-        .roll = end_htobe64(0xBFE0000000000000),     // Double representation of -0.5
-        .yaw = end_htobe64(0x3FD0000000000000)       // Double representation of 0.25
+        .throttle = end_htobe64(double_to_uint64(1.0)), // Double representation of 1.0
+        .pitch = end_htobe64(double_to_uint64(0.5)),    // Double representation of 0.5
+        .roll = end_htobe64(double_to_uint64(-0.5)),     // Double representation of -0.5
+        .yaw = end_htobe64(double_to_uint64(0.25))       // Double representation of 0.25
     };
     
     protocol_header_t hdr1 = {
