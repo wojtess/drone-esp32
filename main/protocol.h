@@ -6,7 +6,37 @@
 
 #define PROTOCOL_CRC_INIT 0xFFFFFFFF
 
-extern uint8_t magic_number[2];
+// IEEE 802.11 Header (24 bytes)
+// Defined in protocol.c as ieee80211header[]
+typedef struct {
+    uint8_t frame_control[2];
+    uint8_t duration[2];
+    uint8_t addr1[6];  // Destination MAC (broadcast)
+    uint8_t addr2[6];  // Source MAC
+    uint8_t addr3[6];  // BSSID
+    uint8_t seq_ctrl[2];
+} ieee80211_header_t;
+
+// Protocol Header (7 bytes)
+// Defined in protocol.c as magic_number[] + header_t
+typedef struct {
+    uint8_t magic[2];  // Fixed value 0x3C4A
+    uint8_t id;        // Packet type identifier
+    uint32_t crc;      // CRC32 of entire packet (header + payload)
+} protocol_header_t;
+
+// Complete Packet Structure
+typedef struct {
+    ieee80211_header_t ieee80211_header;
+    protocol_header_t protocol_header;
+    union {
+        packet_out_0x01 type_0x01;
+        packet_out_0x02 type_0x02;
+        // Add other packet types as needed
+    } payload;
+} complete_packet_t;
+
+extern uint8_t magic_number[2];  // Defined in protocol.c as {0x3C, 0x4A}
 
 //camera data
 typedef struct {
