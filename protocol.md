@@ -107,8 +107,80 @@ Each packet includes a CRC32 checksum calculated over the entire packet (header 
 ## Endianness
 All multi-byte values are transmitted in big-endian (network) byte order. Receivers must convert to host byte order using provided conversion functions.
 
+## Implementation Details
+
+### Endianness and Value Encoding
+All multi-byte values are transmitted in big-endian (network) byte order. Here's how to handle them:
+
+1. **Floating point values** (throttle, pitch, roll, yaw):
+   - Convert double to uint64_t using bitwise casting
+   - Transmit as big-endian uint64_t
+   - Example in C: `uint64_t throttleRaw = *(uint64_t*)&throttle;`
+   
+2. **Integer values** (PWM duty cycles, frequency):
+   - Transmit as big-endian uint32_t
+   - Use standard network byte order conversion functions
+   - Example in Python: `throttle = struct.unpack('>d', throttle_bytes)[0]`
+
+### Packet Ordering Quirk
+The protocol has a funny history behind its packet IDs:
+- Packet 0x01 (Control) came first because "I just wanted to make the thing move!"
+- Packet 0x02 (Config) was added later when I realized "Oh wait, maybe we should configure things too?"
+- Packet 0x03 (PWM) came last because "Fine, I'll give you direct PWM control too!"
+
+So if you're wondering why the IDs aren't in a more logical order, now you know - it's a classic case of "I'll just add one more feature" syndrome!
+
+### Implementation Tips
+1. **CRC Calculation**:
+   - Calculate over entire payload (after protocol header)
+   - Use CRC32 with initial value 0xFFFFFFFF
+   - Many languages have built-in CRC32 support
+
+2. **Error Handling**:
+   - Always verify CRC before processing packets
+   - Discard packets with invalid CRC
+   - Handle missing packets gracefully (this is a best-effort protocol)
+
+3. **Timing**:
+   - Send control packets at regular intervals (e.g. 20ms)
+   - Config packets can be sent less frequently
+   - PWM packets should match the control packet rate
+
 ## Reliability Considerations
 - No built-in retransmission mechanism
 - No sequence numbers for packet ordering
 - Designed for low-latency rather than reliability
 - Applications should handle packet loss appropriately
+
+## Example Implementations
+Here's how you might implement packet handling in different languages:
+
+**Python**:
+```python
+import struct
+import zlib
+
+def handle_packet_0x01(data):
+    throttle = struct.unpack('>d', data[0:8])[0]
+    pitch = struct.unpack('>d', data[8:16])[0]
+    # ... handle other values
+```
+
+**JavaScript**:
+```javascript
+function handlePacket01(buffer) {
+    const view = new DataView(buffer);
+    const throttle = view.getFloat64(0, false); // big-endian
+    const pitch = view.getFloat64(8, false);
+    // ... handle other values
+}
+```
+
+**C#**:
+```csharp
+double throttle = BitConverter.ToDouble(
+    data.Skip(0).Take(8).Reverse().ToArray(), 0);
+double pitch = BitConverter.ToDouble(
+    data.Skip(8).Take(8).Reverse().ToArray(), 0);
+// ... handle other values
+```
