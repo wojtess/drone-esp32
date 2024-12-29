@@ -142,7 +142,11 @@ void app_main(void)
     esp_netif_create_default_wifi_ap();
     
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_err_t err = esp_wifi_init(&cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE("MAIN", "Failed to initialize WiFi: %s", esp_err_to_name(err));
+        return;
+    }
 
     const wifi_country_t wifi_country = {
 			.cc = "CN",
@@ -169,6 +173,10 @@ void app_main(void)
     sniffer_fifo = xQueueCreate(10, sizeof(sniffer_data));
 
     core_task_init_data* data_core_task = malloc(sizeof(core_task_init_data));
+    if (!data_core_task) {
+        ESP_LOGE("MAIN", "Failed to allocate memory for core task data");
+        return;
+    }
     data_core_task->sniffer_fifo = &sniffer_fifo;
     data_core_task->state = &state;
 

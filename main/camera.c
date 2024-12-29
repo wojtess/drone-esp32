@@ -64,9 +64,10 @@ esp_err_t init_camera(void) {
         //initialize the camera
         esp_err_t err = esp_camera_init(&camera_config);
         if (err != ESP_OK) {
-            printf("Failed to init camera\n");
+            ESP_LOGE("CAMERA", "Failed to initialize camera: %s", esp_err_to_name(err));
             return err;
         }
+        ESP_LOGI("CAMERA", "Camera initialized successfully");
         initialized = true;
     }
     return ESP_OK;

@@ -54,12 +54,13 @@ int send_packet_0x02(packet_out_0x02 packet) {
     // Use ESP32's low-level WiFi API to send raw 802.11 packets
     extern int esp_wifi_80211_tx_mod(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
 
-    int err = esp_wifi_80211_tx_mod(WIFI_IF_STA, buf, sizeof(buf), false);
+    int err = esp_wifi_80211_tx_mod(WIFI_IF_STA, buf, buf_size, false);
     if(err != ESP_OK) {
         ESP_LOGE(PROTOCOL_TAG, "Failed to send packet 0x02: %s", esp_err_to_name(err));
         free(buf);
         return err;
     }
+    ESP_LOGD(PROTOCOL_TAG, "Successfully sent packet 0x02 (%d bytes)", buf_size);
     free(buf);
     return ESP_OK;
 }

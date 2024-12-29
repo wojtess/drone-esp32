@@ -13,7 +13,11 @@
 #define LEDC_FREQUENCY          (5000) // Frequency in Hertz. Set frequency at 5 kHz
 
 esp_err_t initMotorsDefault() {
-    return initMotors(12, 13, 15, 14);
+    esp_err_t err = initMotors(12, 13, 15, 14);
+    if (err != ESP_OK) {
+        ESP_LOGE(MOTOR_TAG, "Failed to initialize motors with default pins");
+    }
+    return err;
 }
 
 esp_err_t initMotors(int motorA, int motorB, int motorC, int motorD) {
@@ -49,7 +53,11 @@ esp_err_t initMotors(int motorA, int motorB, int motorC, int motorD) {
         .duty           = 0, // Set duty to 0%
         .hpoint         = 0
     };
-    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel0));
+    err = ledc_channel_config(&ledc_channel0);
+    if (err != ESP_OK) {
+        ESP_LOGE(MOTOR_TAG, "Failed to configure LEDC channel 0: %s", esp_err_to_name(err));
+        return err;
+    }
 
     // Prepare and then apply the LEDC PWM channel configuration
     ledc_channel_config_t ledc_channel1 = {
