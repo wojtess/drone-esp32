@@ -22,12 +22,15 @@ uint8_t ieee80211header[] = {
     //END IEEE802.11 header
 };
 
+#define PROTOCOL_TAG "PROTOCOL"
+
 int send_packet_0x02(packet_out_0x02 packet) {
     // Packet structure: [IEEE802.11 header][magic number][packet ID][CRC32][payload]
     size_t buf_size = sizeof(ieee80211header) + sizeof(magic_number) + 1 + sizeof(uint32_t) + sizeof(packet);
     char* buf = malloc(buf_size);
     if (!buf) {
-        return -1;
+        ESP_LOGE(PROTOCOL_TAG, "Failed to allocate %d bytes for packet buffer", buf_size);
+        return ESP_ERR_NO_MEM;
     }
 
     memcpy(buf, &ieee80211header, sizeof(ieee80211header));
@@ -53,9 +56,11 @@ int send_packet_0x02(packet_out_0x02 packet) {
 
     int err = esp_wifi_80211_tx_mod(WIFI_IF_STA, buf, sizeof(buf), false);
     if(err != ESP_OK) {
-        printf("error while sending packet 0x02");
+        ESP_LOGE(PROTOCOL_TAG, "Failed to send packet 0x02: %s", esp_err_to_name(err));
+        free(buf);
         return err;
     }
+    free(buf);
     return ESP_OK;
 }
 
@@ -72,20 +77,22 @@ int encode_packet_out_0x01(packet_out_0x01 packet, void** buf, int* len) {
 
 //TODO: test
 int send_packet_0x01(packet_out_0x01 packet) {
-    void* buf;
+    void* buf = NULL;
+    void* packet_ieee80211 = NULL;
     int len;
+    
     int err = encode_packet_out_0x01(packet, &buf, &len);
     if(err != 0) {
-        printf("error while encoding packet_0x01: %d\n", err);
-        return -1;
+        ESP_LOGE(PROTOCOL_TAG, "Failed to encode packet 0x01: %d", err);
+        goto cleanup;
     }
 
     int packet_ieee80211_len = sizeof(ieee80211header) + sizeof(magic_number) + 1 /*packet id*/ + len;
-    void* packet_ieee80211 = malloc(packet_ieee80211_len);
-    if(packet_ieee80211 == 0) {
-        printf("error while allocationg packet ieee80211 for packet_0x01\n");
-        free(buf);
-        return -2;
+    packet_ieee80211 = malloc(packet_ieee80211_len);
+    if(packet_ieee80211 == NULL) {
+        ESP_LOGE(PROTOCOL_TAG, "Failed to allocate %d bytes for IEEE802.11 packet", packet_ieee80211_len);
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
     }
 
     // Build complete packet
@@ -102,19 +109,20 @@ int send_packet_0x01(packet_out_0x01 packet) {
     // Copy to final buffer
     memcpy(packet_ieee80211, &packet, sizeof(ieee80211_header_t) + sizeof(protocol_header_t) + len);
 
-    free(buf);
-
     extern int esp_wifi_80211_tx_mod(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
 
     err = esp_wifi_80211_tx_mod(WIFI_IF_STA, packet_ieee80211, packet_ieee80211_len, false);
-
-    free(packet_ieee80211);
     if(err != ESP_OK) {
-        printf("error while sending packet0x01: %s\n", esp_err_to_name(err));
-        return -3;
+        ESP_LOGE(PROTOCOL_TAG, "Failed to send packet 0x01: %s", esp_err_to_name(err));
+        goto cleanup;
     }
 
-    return 0;
+    err = ESP_OK;
+
+cleanup:
+    if(buf) free(buf);
+    if(packet_ieee80211) free(packet_ieee80211);
+    return err;
 }
 
 //END SEND
@@ -161,9 +169,9 @@ int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int
                                          length - sizeof(header_t));
                                          
     if(received_crc != calculated_crc) {
-        ESP_LOGE("PROTOCOL", "CRC mismatch: received %08x, calculated %08x", 
+        ESP_LOGE(PROTOCOL_TAG, "CRC mismatch: received %08x, calculated %08x", 
                 received_crc, calculated_crc);
-        return -1;
+        return PROTOCOL_ERR_CRC_MISMATCH;
     }
 
     // Dispatch packet to appropriate handler based on packet ID

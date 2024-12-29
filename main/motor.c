@@ -89,7 +89,18 @@ esp_err_t initMotors(int motorA, int motorB, int motorC, int motorD) {
 
 }
 
+#define MOTOR_TAG "MOTOR"
+
 void setPWMMotor(enum Motor motor, float pwm) {
+    if (pwm < 0.0f || pwm > 1.0f) {
+        ESP_LOGE(MOTOR_TAG, "Invalid PWM value %f - must be between 0.0 and 1.0", pwm);
+        return;
+    }
+    if (motor < 0 || motor > 3) {
+        ESP_LOGE(MOTOR_TAG, "Invalid motor number %d", motor);
+        return;
+    }
+    
     // Convert float PWM value (0.0 to 1.0) to 13-bit integer (0 to 8191)
     ledc_set_duty(LEDC_MODE, motor, (int)(8191 * pwm)); // 2^13 - 1 = 8191
     ledc_update_duty(LEDC_MODE, motor);
