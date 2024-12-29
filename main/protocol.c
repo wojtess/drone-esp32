@@ -23,17 +23,26 @@ uint8_t ieee80211header[] = {
 };
 
 int send_packet_0x02(packet_out_0x02 packet) {
-    // Packet structure: [IEEE802.11 header][magic number][packet ID][payload]
-    size_t buf_size = sizeof(ieee80211header) + sizeof(magic_number) + 1 + sizeof(packet);
+    // Packet structure: [IEEE802.11 header][magic number][packet ID][CRC32][payload]
+    size_t buf_size = sizeof(ieee80211header) + sizeof(magic_number) + 1 + sizeof(uint32_t) + sizeof(packet);
     char* buf = malloc(buf_size);
     if (!buf) {
         return -1;
     }
 
     memcpy(buf, &ieee80211header, sizeof(ieee80211header));
-    memcpy(buf + sizeof(ieee80211header), &magic_number, sizeof(magic_number));
-    buf[sizeof(ieee80211header) + sizeof(magic_number)] = 0x02;
-    memcpy(buf + sizeof(ieee80211header) + sizeof(magic_number) + /*packet id*/1, &packet, sizeof(packet));
+    // Build packet
+    uint8_t* p = buf + sizeof(ieee80211header);
+    memcpy(p, &magic_number, sizeof(magic_number));
+    p += sizeof(magic_number);
+    *p++ = 0x02; // Packet ID
+    
+    // Calculate CRC
+    uint32_t crc = esp_crc32_le(PROTOCOL_CRC_INIT, p, sizeof(packet));
+    memcpy(p, &crc, sizeof(crc));
+    p += sizeof(crc);
+    
+    memcpy(p, &packet, sizeof(packet));
 
     // Use ESP32's low-level WiFi API to send raw 802.11 packets
     extern int esp_wifi_80211_tx_mod(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
@@ -132,6 +141,18 @@ void handle_packet_0x03(state_t* state, packet_in_0x03* packet) {
 }
 
 int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int length) {
+    // Verify CRC
+    uint32_t received_crc = header->crc;
+    uint32_t calculated_crc = esp_crc32_le(PROTOCOL_CRC_INIT, 
+                                         (uint8_t*)buffer + sizeof(header_t),
+                                         length - sizeof(header_t));
+                                         
+    if(received_crc != calculated_crc) {
+        ESP_LOGE("PROTOCOL", "CRC mismatch: received %08x, calculated %08x", 
+                received_crc, calculated_crc);
+        return -1;
+    }
+
     // Dispatch packet to appropriate handler based on packet ID
     switch (header->id)
     {
