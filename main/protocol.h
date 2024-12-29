@@ -86,12 +86,6 @@ typedef struct {
 
 void handle_packet_0x03(state_t* state, packet_in_0x03* packet);
 
-typedef struct {
-    uint8_t magic[2];
-    uint8_t id;
-    uint32_t crc; // CRC32 of the entire packet including header
-} header_t;
-
-int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int length);
+int decode_and_handle_packet(state_t* state, protocol_header_t* header, void* buffer, int length);
 
 #endif

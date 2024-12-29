@@ -33,14 +33,18 @@ int send_packet_0x02(packet_out_0x02 packet) {
     memcpy(buf, &ieee80211header, sizeof(ieee80211header));
     // Build packet
     uint8_t* p = buf + sizeof(ieee80211header);
-    memcpy(p, &magic_number, sizeof(magic_number));
-    p += sizeof(magic_number);
-    *p++ = 0x02; // Packet ID
+    protocol_header_t header = {
+        .magic = {magic_number[0], magic_number[1]},
+        .id = 0x02,
+        .crc = 0 // Will be calculated below
+    };
     
-    // Calculate CRC
-    uint32_t crc = esp_crc32_le(PROTOCOL_CRC_INIT, p, sizeof(packet));
-    memcpy(p, &crc, sizeof(crc));
-    p += sizeof(crc);
+    // Calculate CRC over payload
+    header.crc = esp_crc32_le(PROTOCOL_CRC_INIT, (uint8_t*)&packet, sizeof(packet));
+    
+    // Copy header
+    memcpy(p, &header, sizeof(header));
+    p += sizeof(header);
     
     memcpy(p, &packet, sizeof(packet));
 
@@ -84,10 +88,19 @@ int send_packet_0x01(packet_out_0x01 packet) {
         return -2;
     }
 
-    memcpy(packet_ieee80211, &ieee80211header, sizeof(ieee80211header));
-    memcpy(packet_ieee80211 + sizeof(ieee80211header), &magic_number, sizeof(magic_number));
-    ((uint8_t*)packet_ieee80211)[sizeof(ieee80211header) + sizeof(magic_number)] = 0x01;//packet id
-    memcpy(packet_ieee80211 + (sizeof(ieee80211header) + sizeof(magic_number) + 1/*packet id*/), buf, len);
+    // Build complete packet
+    complete_packet_t packet = {
+        .ieee80211_header = *(ieee80211_header_t*)ieee80211header,
+        .protocol_header = {
+            .magic = {magic_number[0], magic_number[1]},
+            .id = 0x01,
+            .crc = esp_crc32_le(PROTOCOL_CRC_INIT, buf, len)
+        }
+    };
+    memcpy(&packet.payload.type_0x01, buf, len);
+    
+    // Copy to final buffer
+    memcpy(packet_ieee80211, &packet, sizeof(ieee80211_header_t) + sizeof(protocol_header_t) + len);
 
     free(buf);
 
