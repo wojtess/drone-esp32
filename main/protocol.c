@@ -30,7 +30,7 @@ int send_packet_0x02(packet_out_0x02 packet) {
     char* buf = malloc(buf_size);
     if (!buf) {
         ESP_LOGE(PROTOCOL_TAG, "Failed to allocate %d bytes for packet buffer", buf_size);
-        return ESP_ERR_NO_MEM;
+        return PROTOCOL_ERR_ALLOC;
     }
 
     memcpy(buf, &ieee80211header, sizeof(ieee80211header));
@@ -58,7 +58,7 @@ int send_packet_0x02(packet_out_0x02 packet) {
     if(err != ESP_OK) {
         ESP_LOGE(PROTOCOL_TAG, "Failed to send packet 0x02: %s", esp_err_to_name(err));
         free(buf);
-        return err;
+        return PROTOCOL_ERR_SEND;
     }
     ESP_LOGD(PROTOCOL_TAG, "Successfully sent packet 0x02 (%d bytes)", buf_size);
     free(buf);
@@ -70,7 +70,8 @@ int encode_packet_out_0x01(packet_out_0x01 packet, void** buf, int* len) {
     *len = 4/*index*/ + 4/*len*/ + packet.len /*data*/;
     *buf = malloc(*len);
     if(*buf == NULL) {
-        return -1;
+        ESP_LOGE(PROTOCOL_TAG, "Failed to allocate buffer for packet encoding");
+        return PROTOCOL_ERR_ALLOC;
     }
     memcpy((uint8_t*)*buf + 4 + 4, packet.data, packet.len);
     return 0;
@@ -92,7 +93,7 @@ int send_packet_0x01(packet_out_0x01 packet) {
     packet_ieee80211 = malloc(packet_ieee80211_len);
     if(packet_ieee80211 == NULL) {
         ESP_LOGE(PROTOCOL_TAG, "Failed to allocate %d bytes for IEEE802.11 packet", packet_ieee80211_len);
-        err = ESP_ERR_NO_MEM;
+        err = PROTOCOL_ERR_ALLOC;
         goto cleanup;
     }
 

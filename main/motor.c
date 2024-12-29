@@ -25,7 +25,7 @@ esp_err_t initMotors(int motorA, int motorB, int motorC, int motorD) {
     
     // Validate GPIO pins
     if (motorA < 0 || motorB < 0 || motorC < 0 || motorD < 0) {
-        ESP_LOGE("MOTOR", "Invalid GPIO pin numbers");
+        ESP_LOGE("MOTOR", "Invalid GPIO pin numbers: %d, %d, %d, %d", motorA, motorB, motorC, motorD);
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -42,6 +42,7 @@ esp_err_t initMotors(int motorA, int motorB, int motorC, int motorD) {
         ESP_LOGE("MOTOR", "Failed to configure LEDC timer: %s", esp_err_to_name(err));
         return err;
     }
+    ESP_LOGI("MOTOR", "LEDC timer configured successfully");
 
      // Prepare and then apply the LEDC PWM channel configuration
     ledc_channel_config_t ledc_channel0 = {

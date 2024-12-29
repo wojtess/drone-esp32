@@ -57,8 +57,16 @@ static bool initialized = false;
 esp_err_t init_camera(void) {
     if(!initialized) {
         if(CAM_PIN_PWDN != -1){
-            gpio_set_direction(CAM_PIN_PWDN, GPIO_MODE_OUTPUT);
-            gpio_set_level(CAM_PIN_PWDN, 1);
+            esp_err_t err = gpio_set_direction(CAM_PIN_PWDN, GPIO_MODE_OUTPUT);
+            if (err != ESP_OK) {
+                ESP_LOGE("CAMERA", "Failed to set PWDN pin direction: %s", esp_err_to_name(err));
+                return err;
+            }
+            err = gpio_set_level(CAM_PIN_PWDN, 1);
+            if (err != ESP_OK) {
+                ESP_LOGE("CAMERA", "Failed to set PWDN pin level: %s", esp_err_to_name(err));
+                return err;
+            }
         }
 
         //initialize the camera

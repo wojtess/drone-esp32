@@ -6,13 +6,20 @@
 
 #define PROTOCOL_TAG "PROTOCOL"
 
+/**
+ * @brief Protocol error codes
+ * 
+ * These codes are used to indicate specific error conditions in the protocol layer.
+ * Negative values indicate errors, 0 indicates success.
+ */
 typedef enum {
-    PROTOCOL_OK = 0,
-    PROTOCOL_ERR_ALLOC = -1,
-    PROTOCOL_ERR_INVALID_PACKET = -2,
-    PROTOCOL_ERR_SEND = -3,
-    PROTOCOL_ERR_INVALID_ARG = -4,
-    PROTOCOL_ERR_DECODE = -5
+    PROTOCOL_OK = 0,                ///< Operation completed successfully
+    PROTOCOL_ERR_ALLOC = -1,        ///< Memory allocation failed
+    PROTOCOL_ERR_INVALID_PACKET = -2, ///< Received packet is invalid or malformed
+    PROTOCOL_ERR_SEND = -3,         ///< Failed to send packet
+    PROTOCOL_ERR_INVALID_ARG = -4,  ///< Invalid argument passed to function
+    PROTOCOL_ERR_DECODE = -5,       ///< Failed to decode packet
+    PROTOCOL_ERR_CRC_MISMATCH = -6  ///< CRC check failed (data corruption)
 } protocol_err_t;
 
 #define PROTOCOL_CHECK(x) do { \
