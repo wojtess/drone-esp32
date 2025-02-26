@@ -38,7 +38,7 @@ void handle_packet_0x01(state_t* state, packet_in_0x01* packet);
 //config packet
 typedef struct {
     uint32_t frequency;
-    bool packet_3;//if true then use data from packet_0x03, if false use data from packet_0x01
+    bool pwmRaw;//if true then use data from packet_0x03, if false use data from packet_0x01
 } packet_in_0x02;
 
 void handle_packet_0x02(state_t* state, packet_in_0x02* packet);

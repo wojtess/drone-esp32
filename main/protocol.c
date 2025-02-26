@@ -111,7 +111,7 @@ void handle_packet_0x01(state_t* state, packet_in_0x01* packet) {
 }
 
 void handle_packet_0x02(state_t* state, packet_in_0x02* packet) {
-    state->pwmRaw = packet->packet_3;
+    state->pwmRaw = packet->pwmRaw;
     state->pwmControls.freq = packet->frequency;
 }
 
