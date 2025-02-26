@@ -42,7 +42,8 @@ typedef struct {
 void core_task(void*);//casted to core_task_init_data imiedlity
 
 typedef struct {
-    void* buf;
+    void* buf;//dynamic buffer that we read data from "move" to keep information what data was readed
+    void* buf_original_pointer;//used for freeing memory
     int len;
 } sniffer_data;
 

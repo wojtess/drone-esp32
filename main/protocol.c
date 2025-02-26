@@ -26,7 +26,7 @@ int send_packet_0x02(packet_out_0x02 packet) {
 
     memcpy(buf, &ieee80211header, sizeof(ieee80211header));
     memcpy(buf + sizeof(ieee80211header), &magic_number, sizeof(magic_number));
-    buf[sizeof(ieee80211header) + sizeof(magic_number) + 1] = 0x02;
+    buf[sizeof(ieee80211header) + sizeof(magic_number)] = 0x02;
     memcpy(buf + sizeof(ieee80211header) + sizeof(magic_number) + /*packet id*/1, &packet, sizeof(packet));
 
     extern int esp_wifi_80211_tx_mod(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
@@ -43,10 +43,9 @@ int encode_packet_out_0x01(packet_out_0x01 packet, void** buf, int* len) {
     *len = 4/*index*/ + 4/*len*/ + packet.len /*data*/;
     *buf = malloc(*len);
     if(*buf == 0) {
-        free(buf);
         return -1;
     }
-    memcpy(buf + 4/*index*/ + 4/*len*/, packet.data, packet.len);
+    memcpy(*buf + 4/*index*/ + 4/*len*/, packet.data, packet.len);
     return 0;
 }
 
@@ -103,12 +102,12 @@ void handle_packet_0x01(state_t* state, packet_in_0x01* packet) {
     uint64_t yawRaw = end_be64toh(packet->yaw);
     memcpy(&state->controls.yaw, &yawRaw, sizeof(state->controls.yaw));
 
-    printf("throttle: %lf, pitch: %lf, roll: %lf, yaw: %lf\n",
-        state->controls.throttle,
-        state->controls.pitch,
-        state->controls.roll,
-        state->controls.yaw
-    );
+    // printf("throttle: %lf, pitch: %lf, roll: %lf, yaw: %lf\n",
+    //     state->controls.throttle,
+    //     state->controls.pitch,
+    //     state->controls.roll,
+    //     state->controls.yaw
+    // );   
 }
 
 void handle_packet_0x02(state_t* state, packet_in_0x02* packet) {
@@ -124,6 +123,7 @@ void handle_packet_0x03(state_t* state, packet_in_0x03* packet) {
 }
 
 int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int length) {
+    // printf("recived packet id: %d, len: %d\n", header->id, length);
     switch (header->id)
     {
     case 1: {
@@ -156,6 +156,10 @@ int decode_and_handle_packet(state_t* state, header_t* header, void* buffer, int
     default:
         return -1;
         break;
+    }
+    length-=4;//remove CRC
+    if(length > 0) {    
+        printf("Didnt decode whole packet!!! len: %d\n", length);
     }
     return 0;
 }

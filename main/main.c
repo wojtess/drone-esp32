@@ -6,6 +6,7 @@
 #include "protocol.h"
 #include "core.h"
 #include "camera.h"
+#include "motor.h"  
 
 #include "esp_wifi.h"
 #include "nvs_flash.h"
@@ -28,37 +29,75 @@ static size_t jpg_encode_stream(void * arg, size_t index, const void* data, size
     return 0;
 }
 
+uint32_t calculate_crc32(uint8_t* data, int len) {
+    uint32_t crc = 0xFFFFFFFFU;
+
+    for(int i = 0; i < len; i++) {
+        crc ^= data[i];
+
+        for (int j = 0; j < 8; j++) {
+            if (crc & 1) {
+                crc = (crc >> 1) ^ 0xEDB88320U;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+
+    return ~crc;
+}
+
 void sniffer_callback(void* buf, wifi_promiscuous_pkt_type_t type) {
     // if(type != WIFI_PKT_DATA) {
     //     return;
     // }
     wifi_promiscuous_pkt_t* pkt = (wifi_promiscuous_pkt_t*)buf;
     int pkt_len = pkt->rx_ctrl.sig_len;
-
-    void* buffer = pkt->payload;
+    
+    void* buffer = malloc(pkt_len);
+    // printf("allocated buffer: %p, for len: %d\n", buffer, pkt_len);
+    if(buffer == 0) {
+        // printf("cant allocate buffer for packet\n");
+        return;
+    }
+    memcpy(buffer, pkt->payload, pkt_len);
+    void* bufer_original_pointer = buffer;
 
     if(*(uint8_t*)buffer /*IEEE802.11 packet type and subtype*/ != 0x48) {
         //packet is wrong type
-        return;
+        goto cleanUpIfWrongPacket;
     }
+
     //IEEE header cut
     pkt_len -= 24;
     buffer += 24;
 
     if(pkt_len < sizeof(magic_number) + 1) {
         //packet to small to contain magic number and packet id
-        return;
+        goto cleanUpIfWrongPacket;
     }
 
     header_t* header = (header_t*)buffer;
 
-    if(header->magic[0] == 0x3C || header->magic[1] == 0x4A) {
-        // printf("recived packet with matching magic number, length: %d, packet id: %d\n", pkt_len, header->id);
+    // printf("recived some randin shit\n");
+    
+    if(header->magic[0] == 0x3C && header->magic[1] == 0x4A) {
+        //Check CRC
+        if(calculate_crc32(bufer_original_pointer, pkt_len - 4) == *(uint32_t*)(bufer_original_pointer + pkt_len - 4)) {
+        printf("WRONG CRC! recived packet with matching wrong CRC magic number, length: %d, packet id: %d\n", pkt_len + 24, header->id);
+            goto cleanUpIfWrongPacket;
+        }
+        // printf("recived packet with matching magic number, length: %d, packet id: %d\n", pkt_len + 24, header->id);
 
-        sniffer_data data = {buffer, pkt_len};
+        sniffer_data data = {buffer, bufer_original_pointer, pkt_len};
 
         xQueueSend(sniffer_fifo, &data, 0);
+        return;
     }
+
+    cleanUpIfWrongPacket:
+    // printf("Freeing buffer %p\n", bufer_original_pointer);
+    free(bufer_original_pointer);
 }
 
 void send_task(void* p) {
@@ -164,6 +203,8 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(sniffer_callback));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
 
+    initMotorsDefault();
+
     state.mutex = xSemaphoreCreateMutex();
 
     sniffer_fifo = xQueueCreate(10, sizeof(sniffer_data));
@@ -172,8 +213,8 @@ void app_main(void)
     data_core_task->sniffer_fifo = &sniffer_fifo;
     data_core_task->state = &state;
 
-    xTaskCreate(&capture_task, "capture_task", 4096, 0, 4, 0);
-    xTaskCreate(&send_task, "send_task", 4096, 0, 5, 0);
+    // xTaskCreate(&capture_task, "capture_task", 4096, 0, 4, 0);   
+    // xTaskCreate(&send_task, "send_task", 4096, 0, 5, 0);
     //data_core_task is freed in core_task after reciving it
     xTaskCreate(&core_task, "core_task", 4096, data_core_task, tskIDLE_PRIORITY, 0);
 }

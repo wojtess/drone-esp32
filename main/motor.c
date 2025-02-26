@@ -77,6 +77,9 @@ void initMotors(int motorA, int motorB, int motorC, int motorD) {
 }
 
 void setPWMMotor(enum Motor motor, float pwm) {
+    if(pwm < 0) {
+        pwm = 0;
+    }
     ledc_set_duty(LEDC_MODE, motor, (int)((pow(2.0, 13.0) - 1.0) * pwm));
     ledc_update_duty(LEDC_MODE, motor);
 }
